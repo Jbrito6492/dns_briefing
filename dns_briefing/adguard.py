@@ -17,10 +17,36 @@ class QueryEntry:
     block_rule: str
 
 
+def _parse_entry(raw: dict) -> QueryEntry:
+    return QueryEntry(
+        time=datetime.fromisoformat(raw["time"].replace("Z", "+00:00")),
+        client=raw.get("client", ""),
+        domain=raw["question"]["name"],
+        query_type=raw["question"]["type"],
+        reason=raw.get("reason", ""),
+        blocked=raw.get("reason", "") == "FilteredBlackList",
+        block_rule=raw.get("rule", ""),
+    )
+
+
 class AdGuardClient:
     def __init__(self, base_url: str, username: str, password: str):
         self._base_url = base_url.rstrip("/")
         self._auth = (username, password)
+
+    def _fetch_page(self, older_than: str) -> tuple[list[dict], str]:
+        params: dict[str, str | int] = {"limit": 1000}
+        if older_than:
+            params["older_than"] = older_than
+        resp = requests.get(
+            f"{self._base_url}/control/querylog",
+            params=params,
+            auth=self._auth,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("data", []), data.get("oldest", "")
 
     def fetch_window(self, hours: int, now: datetime | None = None) -> list[QueryEntry]:
         if now is None:
@@ -31,40 +57,16 @@ class AdGuardClient:
         older_than = ""
 
         while True:
-            params = {"limit": 1000}
-            if older_than:
-                params["older_than"] = older_than
-
-            resp = requests.get(
-                f"{self._base_url}/control/querylog",
-                params=params,
-                auth=self._auth,
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-            page = data.get("data", [])
-            oldest_str = data.get("oldest", "")
+            page, oldest_str = self._fetch_page(older_than)
 
             if not page:
                 break
 
             for raw in page:
-                t = datetime.fromisoformat(raw["time"].replace("Z", "+00:00"))
-                if t < cutoff:
+                entry = _parse_entry(raw)
+                if entry.time < cutoff:
                     return entries
-                entries.append(
-                    QueryEntry(
-                        time=t,
-                        client=raw.get("client", ""),
-                        domain=raw["question"]["name"],
-                        query_type=raw["question"]["type"],
-                        reason=raw.get("reason", ""),
-                        blocked=raw.get("reason", "") == "FilteredBlackList",
-                        block_rule=raw.get("rule", ""),
-                    )
-                )
+                entries.append(entry)
 
             if not oldest_str:
                 break
