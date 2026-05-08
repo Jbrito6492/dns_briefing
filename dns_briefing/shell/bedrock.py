@@ -6,7 +6,7 @@ from typing import Any
 
 import boto3
 
-from dns_briefing.prompt import SYSTEM_PROMPT
+from dns_briefing.core.prompt import SYSTEM_PROMPT
 
 
 class BedrockClient:
