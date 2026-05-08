@@ -57,7 +57,7 @@ def test_fetch_returns_entries_within_window():
     )
 
     client = AdGuardClient(BASE_URL, USER, PASS)
-    entries = client.fetch_last_24h(now=now)
+    entries = client.fetch_window(hours=24, now=now)
 
     assert len(entries) == 1
     assert entries[0].domain == "example.com"
@@ -86,7 +86,7 @@ def test_fetch_paginates_until_cutoff():
                  json=make_agh_response(page3_entries, oldest=page3_entries[-1]["time"]))
 
     client = AdGuardClient(BASE_URL, USER, PASS)
-    entries = client.fetch_last_24h(now=now)
+    entries = client.fetch_window(hours=24, now=now)
 
     assert len(entries) == 6
     assert all(e.domain.startswith("domain") for e in entries)
@@ -105,7 +105,7 @@ def test_entry_blocked_flag():
                  json=make_agh_response([], oldest=""))
 
     client = AdGuardClient(BASE_URL, USER, PASS)
-    entries = client.fetch_last_24h(now=now)
+    entries = client.fetch_window(hours=24, now=now)
 
     assert entries[0].blocked is True
     assert entries[0].block_rule == "||ads.example.com^"

@@ -27,6 +27,7 @@ class ReportConfig:
     off_hours_end: str
     timezone: str
     network_name: str
+    window_hours: int = 24
 
 
 @dataclass
@@ -82,6 +83,7 @@ def load_config(path: Path) -> Config:
             off_hours_end=raw["report"]["off_hours_end"],
             timezone=raw["report"]["timezone"],
             network_name=raw["report"]["network_name"],
+            window_hours=raw["report"].get("window_hours", 24),
         ),
         state=StateConfig(
             db_path=raw["state"]["db_path"],

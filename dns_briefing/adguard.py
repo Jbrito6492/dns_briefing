@@ -20,10 +20,10 @@ class AdGuardClient:
         self._base_url = base_url.rstrip("/")
         self._auth = (username, password)
 
-    def fetch_last_24h(self, now: datetime | None = None) -> list[QueryEntry]:
+    def fetch_window(self, hours: int, now: datetime | None = None) -> list[QueryEntry]:
         if now is None:
             now = datetime.now(tz=timezone.utc)
-        cutoff = now - timedelta(hours=24)
+        cutoff = now - timedelta(hours=hours)
 
         entries: list[QueryEntry] = []
         older_than = ""

@@ -12,6 +12,7 @@ off_hours_start = "01:00"
 off_hours_end = "05:00"
 timezone = "America/Phoenix"
 network_name = "Home Network"
+window_hours = 24
 
 [state]
 db_path = "/home/ubuntu/dns_briefing/data/state.db"
