@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from dns_briefing.adguard import QueryEntry
+from dns_briefing.shell.adguard import QueryEntry
 from tests.conftest import build_fixture_entries
 
 DEVICE_MAP = {
@@ -57,7 +57,7 @@ def entries() -> list[QueryEntry]:
 
 @pytest.fixture
 def packet(entries: list[QueryEntry]) -> dict:
-    from dns_briefing.aggregator import build_evidence_packet
+    from dns_briefing.core.aggregator import build_evidence_packet
 
     return build_evidence_packet(
         entries=entries,

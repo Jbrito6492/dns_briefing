@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from dns_briefing.state import StateDB
+from dns_briefing.shell.state import StateDB
 
 
 @pytest.fixture

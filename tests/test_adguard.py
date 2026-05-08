@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import responses as resp_lib
 
-from dns_briefing.adguard import AdGuardClient
+from dns_briefing.shell.adguard import AdGuardClient
 
 BASE_URL = "http://localhost:3080"
 USER = "admin"

@@ -4,8 +4,8 @@ import json
 from typing import Any
 from unittest.mock import MagicMock
 
-from dns_briefing.bedrock import BedrockClient
-from dns_briefing.prompt import build_prompt
+from dns_briefing.core.prompt import build_prompt
+from dns_briefing.shell.bedrock import BedrockClient
 
 
 def _sample_packet() -> dict[str, Any]:
