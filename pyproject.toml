@@ -38,6 +38,9 @@ ignore_missing_imports = true
 [project.scripts]
 dns-briefing = "dns_briefing.__main__:main"
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["dns_briefing*"]
