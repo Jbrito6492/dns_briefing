@@ -10,7 +10,7 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "querylog_24h.json"
 
 # Window: 2026-05-08 07:00 UTC → 2026-05-09 07:00 UTC (midnight→midnight Phoenix/MST-7)
 WINDOW_START = datetime(2026, 5, 8, 7, 0, 0, tzinfo=UTC)
-WINDOW_END = datetime(2026, 5, 9, 7, 0, 0, tzinfo=UTC)
+WINDOW_END = datetime(2026, 5, 9, 7, 0, 0, tzinfo=UTC)  # exclusive upper bound
 
 # Off-hours in UTC: 01:00–05:00 Phoenix = 08:00–12:00 UTC on 2026-05-08
 OFF_HOURS_START_UTC = datetime(2026, 5, 8, 8, 0, 0, tzinfo=UTC)
@@ -118,6 +118,14 @@ def build_fixture_entries() -> list[dict]:
 
     # Newest-first (AGH querylog order)
     entries.sort(key=lambda e: e["time"], reverse=True)
+
+    # Guard: no entry should fall outside the declared window
+    for e in entries:
+        t = datetime.fromisoformat(e["time"].replace("Z", "+00:00"))
+        assert WINDOW_START <= t <= WINDOW_END, (
+            f"Fixture entry {e['question']['name']} at {t} outside window"
+        )
+
     return entries
 
 

@@ -23,6 +23,10 @@ if [ -n "$STAGED_PY" ]; then
     echo "ERROR: ruff format check failed. Run: uv run ruff format dns_briefing/ tests/"
     FAIL=1
   fi
+  if ! uv run mypy dns_briefing/ 2>&1; then
+    echo "ERROR: mypy type check failed. Run: uv run mypy dns_briefing/"
+    FAIL=1
+  fi
 fi
 
 # Only scan TOML config files for private IP device maps — not test/code files.

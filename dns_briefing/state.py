@@ -22,7 +22,7 @@ class StateDB:
     ) -> None:
         self._con.close()
 
-    def _init_schema(self):
+    def _init_schema(self) -> None:
         self._con.execute("""
             CREATE TABLE IF NOT EXISTS known_domains (
                 domain TEXT PRIMARY KEY,
@@ -65,7 +65,7 @@ class StateDB:
 
         return new_domains
 
-    def record_daily_volume(self, client_counts: dict[str, int], day: date):
+    def record_daily_volume(self, client_counts: dict[str, int], day: date) -> None:
         for client_ip, count in client_counts.items():
             self._con.execute(
                 """

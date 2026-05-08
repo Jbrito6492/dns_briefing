@@ -1,5 +1,7 @@
 from datetime import date, timedelta
+
 import pytest
+
 from dns_briefing.state import StateDB
 
 

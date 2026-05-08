@@ -1,7 +1,7 @@
 # tests/test_config.py
-import os
-import pytest
 from pathlib import Path
+
+import pytest
 
 CONFIG_TOML = Path(__file__).parent.parent / "config.toml"
 
@@ -11,6 +11,7 @@ def test_load_config_reads_toml(monkeypatch):
     monkeypatch.setenv("AGH_PASSWORD", "secret")
 
     from dns_briefing.config import load_config
+
     cfg = load_config(CONFIG_TOML)
 
     assert cfg.adguard.base_url == "http://localhost:3080"
@@ -43,6 +44,7 @@ off_hours_start = "01:00"
 off_hours_end = "05:00"
 timezone = "America/Phoenix"
 network_name = "Test Net"
+window_hours = 24
 
 [state]
 db_path = "/tmp/state.db"
@@ -60,6 +62,7 @@ volume_baseline_days = 14
 """)
 
     from dns_briefing.config import load_config
+
     cfg = load_config(base)
 
     assert cfg.devices["192.168.1.10"] == "Smart TV"
@@ -86,6 +89,7 @@ off_hours_start = "01:00"
 off_hours_end = "05:00"
 timezone = "America/Phoenix"
 network_name = "Test Net"
+window_hours = 24
 
 [state]
 db_path = "/tmp/state.db"
@@ -97,6 +101,7 @@ volume_baseline_days = 14
     # No config.local.toml — should not error
 
     from dns_briefing.config import load_config
+
     cfg = load_config(base)
 
     assert cfg.devices == {}
@@ -107,5 +112,6 @@ def test_missing_env_var_raises(monkeypatch):
     monkeypatch.delenv("AGH_USERNAME", raising=False)
 
     from dns_briefing.config import load_config
+
     with pytest.raises(ValueError, match="AGH_PASSWORD"):
         load_config(CONFIG_TOML)

@@ -2,8 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import requests
+
+# All AGH reason codes that mean "this query was blocked by a filter".
+# Adding a new AGH filter type = add it here, no other changes needed.
+_BLOCKED_REASONS: frozenset[str] = frozenset(
+    {
+        "FilteredBlackList",
+        "FilteredSafeSearch",
+        "FilteredParental",
+        "FilteredCustom",
+    }
+)
 
 
 @dataclass
@@ -17,14 +29,14 @@ class QueryEntry:
     block_rule: str
 
 
-def _parse_entry(raw: dict) -> QueryEntry:
+def _parse_entry(raw: dict[str, Any]) -> QueryEntry:
     return QueryEntry(
         time=datetime.fromisoformat(raw["time"].replace("Z", "+00:00")),
         client=raw.get("client", ""),
         domain=raw["question"]["name"],
         query_type=raw["question"]["type"],
         reason=raw.get("reason", ""),
-        blocked=raw.get("reason", "") == "FilteredBlackList",
+        blocked=raw.get("reason", "") in _BLOCKED_REASONS,
         block_rule=raw.get("rule", ""),
     )
 
@@ -34,7 +46,7 @@ class AdGuardClient:
         self._base_url = base_url.rstrip("/")
         self._auth = (username, password)
 
-    def _fetch_page(self, older_than: str) -> tuple[list[dict], str]:
+    def _fetch_page(self, older_than: str) -> tuple[list[dict[str, Any]], str]:
         params: dict[str, str | int] = {"limit": 1000}
         if older_than:
             params["older_than"] = older_than

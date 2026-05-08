@@ -1,9 +1,8 @@
-import json
-from datetime import datetime, timezone, timedelta
-import responses as resp_lib
-import pytest
-from dns_briefing.adguard import AdGuardClient, QueryEntry
+from datetime import UTC, datetime, timedelta
 
+import responses as resp_lib
+
+from dns_briefing.adguard import AdGuardClient
 
 BASE_URL = "http://localhost:3080"
 USER = "admin"
@@ -17,7 +16,9 @@ def make_agh_response(entries: list, oldest: str | None = None) -> dict:
     }
 
 
-def make_raw_entry(time_iso: str, client: str, domain: str, reason: str = "NotFilteredNotFound") -> dict:
+def make_raw_entry(
+    time_iso: str, client: str, domain: str, reason: str = "NotFilteredNotFound"
+) -> dict:
     return {
         "answer": [{"type": "A", "value": "1.2.3.4", "ttl": 300}],
         "answer_dnssec": False,
@@ -38,12 +39,16 @@ def make_raw_entry(time_iso: str, client: str, domain: str, reason: str = "NotFi
 
 @resp_lib.activate
 def test_fetch_returns_entries_within_window():
-    now = datetime(2026, 5, 8, 15, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 8, 15, 0, 0, tzinfo=UTC)
     in_window = now - timedelta(hours=12)
     out_of_window = now - timedelta(hours=25)
 
-    entry_in = make_raw_entry(in_window.strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "example.com")
-    entry_out = make_raw_entry(out_of_window.strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "old.com")
+    entry_in = make_raw_entry(
+        in_window.strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "example.com"
+    )
+    entry_out = make_raw_entry(
+        out_of_window.strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "old.com"
+    )
 
     resp_lib.add(
         resp_lib.GET,
@@ -65,25 +70,44 @@ def test_fetch_returns_entries_within_window():
 
 @resp_lib.activate
 def test_fetch_paginates_until_cutoff():
-    now = datetime(2026, 5, 8, 15, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 8, 15, 0, 0, tzinfo=UTC)
     page1_entries = [
-        make_raw_entry((now - timedelta(hours=i)).strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", f"domain{i}.com")
+        make_raw_entry(
+            (now - timedelta(hours=i)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "192.168.1.10",
+            f"domain{i}.com",
+        )
         for i in range(1, 4)
     ]
     page2_entries = [
-        make_raw_entry((now - timedelta(hours=i)).strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", f"domain{i}.com")
+        make_raw_entry(
+            (now - timedelta(hours=i)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "192.168.1.10",
+            f"domain{i}.com",
+        )
         for i in range(4, 7)
     ]
     page3_entries = [
-        make_raw_entry((now - timedelta(hours=25)).strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "old.com")
+        make_raw_entry(
+            (now - timedelta(hours=25)).strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "old.com"
+        )
     ]
 
-    resp_lib.add(resp_lib.GET, f"{BASE_URL}/control/querylog",
-                 json=make_agh_response(page1_entries, oldest=page1_entries[-1]["time"]))
-    resp_lib.add(resp_lib.GET, f"{BASE_URL}/control/querylog",
-                 json=make_agh_response(page2_entries, oldest=page2_entries[-1]["time"]))
-    resp_lib.add(resp_lib.GET, f"{BASE_URL}/control/querylog",
-                 json=make_agh_response(page3_entries, oldest=page3_entries[-1]["time"]))
+    resp_lib.add(
+        resp_lib.GET,
+        f"{BASE_URL}/control/querylog",
+        json=make_agh_response(page1_entries, oldest=page1_entries[-1]["time"]),
+    )
+    resp_lib.add(
+        resp_lib.GET,
+        f"{BASE_URL}/control/querylog",
+        json=make_agh_response(page2_entries, oldest=page2_entries[-1]["time"]),
+    )
+    resp_lib.add(
+        resp_lib.GET,
+        f"{BASE_URL}/control/querylog",
+        json=make_agh_response(page3_entries, oldest=page3_entries[-1]["time"]),
+    )
 
     client = AdGuardClient(BASE_URL, USER, PASS)
     entries = client.fetch_window(hours=24, now=now)
@@ -94,15 +118,21 @@ def test_fetch_paginates_until_cutoff():
 
 @resp_lib.activate
 def test_entry_blocked_flag():
-    now = datetime(2026, 5, 8, 15, 0, 0, tzinfo=timezone.utc)
-    raw = make_raw_entry(now.strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "ads.example.com", "FilteredBlackList")
+    now = datetime(2026, 5, 8, 15, 0, 0, tzinfo=UTC)
+    raw = make_raw_entry(
+        now.strftime("%Y-%m-%dT%H:%M:%SZ"), "192.168.1.10", "ads.example.com", "FilteredBlackList"
+    )
     raw["rule"] = "||ads.example.com^"
     raw["rules"] = [{"filter_list_id": 1, "text": "||ads.example.com^"}]
 
-    resp_lib.add(resp_lib.GET, f"{BASE_URL}/control/querylog",
-                 json=make_agh_response([raw], oldest=now.strftime("%Y-%m-%dT%H:%M:%SZ")))
-    resp_lib.add(resp_lib.GET, f"{BASE_URL}/control/querylog",
-                 json=make_agh_response([], oldest=""))
+    resp_lib.add(
+        resp_lib.GET,
+        f"{BASE_URL}/control/querylog",
+        json=make_agh_response([raw], oldest=now.strftime("%Y-%m-%dT%H:%M:%SZ")),
+    )
+    resp_lib.add(
+        resp_lib.GET, f"{BASE_URL}/control/querylog", json=make_agh_response([], oldest="")
+    )
 
     client = AdGuardClient(BASE_URL, USER, PASS)
     entries = client.fetch_window(hours=24, now=now)
