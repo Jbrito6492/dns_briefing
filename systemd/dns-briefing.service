@@ -1,0 +1,19 @@
+[Unit]
+Description=DNS Briefing Daily Report
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+EnvironmentFile=/home/ubuntu/.env.dns_briefing
+ExecStart=/usr/bin/docker run --rm \
+  --name dns-briefing \
+  --env-file /home/ubuntu/.env.dns_briefing \
+  --network host \
+  -v /home/ubuntu/dns_briefing/data:/home/ubuntu/dns_briefing/data \
+  -v /home/ubuntu/dns_briefing/reports:/home/ubuntu/dns_briefing/reports \
+  -v /home/ubuntu/dns_briefing/config.local.toml:/app/config.local.toml:ro \
+  dns-briefing:latest
+StandardOutput=journal
+StandardError=journal

@@ -71,6 +71,7 @@ def run(config: Config, dry_run: bool = False) -> str:
         local_dir=config.report.local_dir,
         s3_bucket=config.aws.s3_bucket,
         region=config.aws.region,
+        network_name=config.report.network_name,
         dry_run=dry_run,
     )
     writer.write(report, today)
