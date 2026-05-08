@@ -1,0 +1,8 @@
+# Copy to config.local.toml and fill in your device IPs.
+# config.local.toml is gitignored — never commit it.
+# The [devices] section here overrides/extends config.toml's empty [devices] table.
+
+[devices]
+"192.168.0.1"   = "Router"
+"192.168.0.10"  = "FireTV-Living-Room"
+"100.x.x.x"    = "My Phone"

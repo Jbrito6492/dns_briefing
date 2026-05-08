@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Blocks commits that contain patterns suggesting private network data.
+# Install: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+STAGED=$(git diff --cached --name-only)
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+FAIL=0
+
+# Patterns that suggest private device maps (IP = "Name" in TOML)
+DEVICE_MAP_PATTERN='"\(192\.168\|10\.\|172\.1[6-9]\|172\.2[0-9]\|172\.3[01]\|100\.[6-9][0-9]\|100\.1[01][0-9]\|100\.12[0-7]\)\.[0-9]'
+
+# Check for Tailscale CGNAT range (100.64.0.0/10) device maps
+# Check for RFC1918 device maps
+for f in $STAGED; do
+  if git show ":$f" 2>/dev/null | grep -qE "$DEVICE_MAP_PATTERN"; then
+    echo "ERROR: $f appears to contain private IP addresses in a device map."
+    echo "       Put device mappings in config.local.toml (gitignored), not committed files."
+    FAIL=1
+  fi
+done
+
+# Block config.local.toml itself from ever being staged
+if echo "$STAGED" | grep -q "config\.local\.toml$"; then
+  echo "ERROR: config.local.toml is private and must never be committed."
+  FAIL=1
+fi
+
+if [ "$FAIL" -eq 1 ]; then
+  echo ""
+  echo "Commit blocked. See above for details."
+  exit 1
+fi

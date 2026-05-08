@@ -1,0 +1,22 @@
+[adguard]
+base_url = "http://localhost:3080"
+
+[aws]
+region = "us-west-2"
+bedrock_model_id = "us.anthropic.claude-sonnet-4-6"
+s3_bucket = "mav-dns-briefing"
+
+[report]
+local_dir = "/home/ubuntu/dns_briefing/reports"
+off_hours_start = "01:00"
+off_hours_end = "05:00"
+timezone = "America/Phoenix"
+network_name = "Home Network"
+
+[state]
+db_path = "/home/ubuntu/dns_briefing/data/state.db"
+known_domains_window_days = 30
+volume_baseline_days = 14
+
+# Device map lives in config.local.toml (gitignored) — see config.local.toml.example
+[devices]
