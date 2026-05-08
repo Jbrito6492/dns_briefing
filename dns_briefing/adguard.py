@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+
 import requests
 
 
@@ -22,7 +24,7 @@ class AdGuardClient:
 
     def fetch_window(self, hours: int, now: datetime | None = None) -> list[QueryEntry]:
         if now is None:
-            now = datetime.now(tz=timezone.utc)
+            now = datetime.now(tz=UTC)
         cutoff = now - timedelta(hours=hours)
 
         entries: list[QueryEntry] = []
@@ -52,15 +54,17 @@ class AdGuardClient:
                 t = datetime.fromisoformat(raw["time"].replace("Z", "+00:00"))
                 if t < cutoff:
                     return entries
-                entries.append(QueryEntry(
-                    time=t,
-                    client=raw.get("client", ""),
-                    domain=raw["question"]["name"],
-                    query_type=raw["question"]["type"],
-                    reason=raw.get("reason", ""),
-                    blocked=raw.get("reason", "") == "FilteredBlackList",
-                    block_rule=raw.get("rule", ""),
-                ))
+                entries.append(
+                    QueryEntry(
+                        time=t,
+                        client=raw.get("client", ""),
+                        domain=raw["question"]["name"],
+                        query_type=raw["question"]["type"],
+                        reason=raw.get("reason", ""),
+                        blocked=raw.get("reason", "") == "FilteredBlackList",
+                        block_rule=raw.get("rule", ""),
+                    )
+                )
 
             if not oldest_str:
                 break

@@ -12,6 +12,19 @@ fi
 
 FAIL=0
 
+# Ruff lint + format check on staged Python files
+STAGED_PY=$(echo "$STAGED" | grep '\.py$' || true)
+if [ -n "$STAGED_PY" ]; then
+  if ! uv run ruff check $STAGED_PY 2>&1; then
+    echo "ERROR: ruff lint failed. Run: uv run ruff check --fix dns_briefing/ tests/"
+    FAIL=1
+  fi
+  if ! uv run ruff format --check $STAGED_PY 2>&1; then
+    echo "ERROR: ruff format check failed. Run: uv run ruff format dns_briefing/ tests/"
+    FAIL=1
+  fi
+fi
+
 # Only scan TOML config files for private IP device maps — not test/code files.
 # Pattern: quoted private IP followed by = (TOML key-value, e.g. "192.168.x.x" = "Device")
 DEVICE_MAP_PATTERN='"(192\.168|10\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[01]\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)'
