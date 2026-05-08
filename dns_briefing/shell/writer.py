@@ -55,7 +55,11 @@ body {{
   line-height: 1.78;
   min-height: 100vh;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }}
+
+/* Prevent any element from blowing out the layout */
+main, header, footer, article {{ max-width: 100%; overflow-x: hidden; }}
 
 /* Grain overlay */
 body::after {{
@@ -221,6 +225,11 @@ main {{
 }}
 
 /* ── Body text ── */
+.report {{
+  overflow-wrap: break-word;
+  word-break: break-word;
+}}
+
 .report p {{
   font-size: 1rem;
   line-height: 1.82;
@@ -257,6 +266,8 @@ main {{
   border: 1px solid var(--accent-bd);
   padding: .1em .32em;
   border-radius: 2px;
+  word-break: break-all;       /* long domains wrap instead of overflow */
+  overflow-wrap: anywhere;
 }}
 
 .report pre {{
@@ -265,6 +276,8 @@ main {{
   padding: 1.25em 1.5em;
   overflow-x: auto;
   margin: 1.4em 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }}
 
 .report pre code {{
@@ -299,15 +312,19 @@ footer {{
 
 footer .sep {{ color: var(--border-hi); }}
 
-@media (max-width: 600px) {{
+@media (max-width: 640px) {{
   html {{ font-size: 16px; }}
-  header {{ padding: 36px 20px 24px; }}
-  main {{ padding: 28px 20px 48px; }}
-  footer {{ padding: 16px 20px 36px; flex-wrap: wrap; gap: 6px; }}
-  h1 {{ font-size: 2.8rem; }}
-  .header-row {{ flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }}
-  .tldr-card {{ padding: 18px 16px; }}
-  .report h2 {{ margin-top: 36px; }}
+  header, main, footer {{ padding-left: 18px; padding-right: 18px; }}
+  header {{ padding-top: 36px; padding-bottom: 24px; }}
+  main {{ padding-top: 24px; padding-bottom: 48px; }}
+  footer {{ padding-top: 16px; padding-bottom: 32px; flex-wrap: wrap; gap: 6px; }}
+  h1 {{ font-size: 2.5rem; }}
+  .header-row {{ flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 18px; }}
+  .classification {{ white-space: normal; word-break: break-word; }}
+  .tldr-card {{ padding: 16px 14px; }}
+  .tldr-card li {{ font-size: .95rem; }}
+  .report h2 {{ margin-top: 32px; }}
+  .network-tag {{ font-size: .52rem; }}
 }}
 </style>
 </head>
