@@ -298,6 +298,17 @@ footer {{
 }}
 
 footer .sep {{ color: var(--border-hi); }}
+
+@media (max-width: 600px) {{
+  html {{ font-size: 16px; }}
+  header {{ padding: 36px 20px 24px; }}
+  main {{ padding: 28px 20px 48px; }}
+  footer {{ padding: 16px 20px 36px; flex-wrap: wrap; gap: 6px; }}
+  h1 {{ font-size: 2.8rem; }}
+  .header-row {{ flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }}
+  .tldr-card {{ padding: 18px 16px; }}
+  .report h2 {{ margin-top: 36px; }}
+}}
 </style>
 </head>
 <body>
@@ -425,6 +436,14 @@ main {{ padding: 44px 0 72px; }}
 footer {{
   padding: 20px 0 48px; border-top: 1px solid var(--border);
   font-family: var(--ff-mono); font-size: .6rem; letter-spacing: .1em; color: var(--text-muted);
+}}
+@media (max-width: 600px) {{
+  html {{ font-size: 16px; }}
+  .wrap {{ padding: 0 20px; }}
+  header {{ padding: 36px 0 24px; }}
+  h1 {{ font-size: 2.6rem; }}
+  .latest-btn {{ display: block; text-align: center; margin-top: 20px; }}
+  .report-list a {{ font-size: .68rem; }}
 }}
 </style>
 </head>
