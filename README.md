@@ -14,10 +14,11 @@ AdGuard Home HTTP API
   → DuckDB aggregation (top domains, off-hours, new domains, per-device z-scores, blocked)
   → structured JSON evidence packet
   → Claude Sonnet via AWS Bedrock
-  → Markdown report → S3 + local file
+  → Markdown + HTML report → S3 + local file
+  → served via nginx (mobile-friendly dark UI)
 ```
 
-Runs daily via a systemd timer. One Docker container, no persistent services.
+Runs daily via a systemd timer. Two Docker containers: one oneshot job, one nginx serving the web UI.
 
 ## Requirements
 
@@ -130,7 +131,24 @@ docker run --rm \
   python -m dns_briefing --dry-run
 ```
 
-### 5. systemd timer (runs daily at 08:00 local time)
+### 5. Web UI (optional)
+
+Serve the HTML reports via nginx. On your server:
+
+```bash
+docker run -d \
+  --name dns-briefing-web \
+  --restart unless-stopped \
+  -p 8765:80 \
+  -v /path/to/reports:/usr/share/nginx/html:ro \
+  nginx:alpine
+```
+
+Then browse to `http://your-host:8765`. Each daily run regenerates `index.html`, `latest.html`, and a dated `YYYY-MM-DD.html`.
+
+If you use Tailscale, this is accessible from any device on your tailnet with no port forwarding.
+
+### 6. systemd timer (runs daily at 08:00 local time)
 
 Copy the unit files from `systemd/` to `/etc/systemd/system/`, then:
 
@@ -139,6 +157,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable dns-briefing.timer
 sudo systemctl start dns-briefing.timer
 ```
+
+**Note:** The first time you invoke the Bedrock model, it must be done by a user with AWS Marketplace permissions to enable it account-wide. Run the dry-run once with admin credentials if the IAM user gets an AccessDeniedException on first use.
 
 ## Architecture
 
