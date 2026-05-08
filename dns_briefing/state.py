@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from types import TracebackType
 
 import duckdb
 
@@ -9,6 +10,17 @@ class StateDB:
     def __init__(self, db_path: str):
         self._con = duckdb.connect(db_path)
         self._init_schema()
+
+    def __enter__(self) -> StateDB:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self._con.close()
 
     def _init_schema(self):
         self._con.execute("""
