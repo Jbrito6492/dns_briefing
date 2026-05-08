@@ -10,3 +10,5 @@ data/
 .env*
 config.local.toml
 docs/
+.idea/
+.githooks/
