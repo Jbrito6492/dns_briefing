@@ -53,28 +53,30 @@ class StateDB:
 
         new_domains = [d for d in domains if d not in known]
 
-        for domain in domains:
-            self._con.execute(
-                """
-                INSERT INTO known_domains (domain, first_seen, last_seen)
-                VALUES (?, ?, ?)
-                ON CONFLICT (domain) DO UPDATE SET last_seen = excluded.last_seen
-            """,
-                [domain, today, today],
-            )
+        # Bulk upsert via temp table — avoids N individual SQL round-trips
+        self._con.execute("CREATE TEMP TABLE IF NOT EXISTS _bulk_domains (domain TEXT, d DATE)")
+        self._con.execute("DELETE FROM _bulk_domains")
+        self._con.executemany(
+            "INSERT INTO _bulk_domains VALUES (?, ?)",
+            [(d, today) for d in domains],
+        )
+        self._con.execute("""
+            INSERT INTO known_domains (domain, first_seen, last_seen)
+            SELECT domain, d, d FROM _bulk_domains
+            ON CONFLICT (domain) DO UPDATE SET last_seen = excluded.last_seen
+        """)
 
         return new_domains
 
     def record_daily_volume(self, client_counts: dict[str, int], day: date) -> None:
-        for client_ip, count in client_counts.items():
-            self._con.execute(
-                """
-                INSERT INTO daily_client_volume (date, client_ip, query_count)
-                VALUES (?, ?, ?)
-                ON CONFLICT (date, client_ip) DO UPDATE SET query_count = excluded.query_count
+        self._con.executemany(
+            """
+            INSERT INTO daily_client_volume (date, client_ip, query_count)
+            VALUES (?, ?, ?)
+            ON CONFLICT (date, client_ip) DO UPDATE SET query_count = excluded.query_count
             """,
-                [day, client_ip, count],
-            )
+            [(day, ip, count) for ip, count in client_counts.items()],
+        )
 
     def get_volume_baseline(
         self, baseline_days: int, reference_date: date
