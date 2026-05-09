@@ -171,11 +171,14 @@ dns_briefing/
   shell/           # I/O wrappers — all side effects live here
     adguard.py     # AGH HTTP client
     bedrock.py     # Bedrock InvokeModel
+    intercept.py   # reads DNS intercept stats (optional)
     state.py       # DuckDB state (known domains, volume baseline)
     writer.py      # S3 + local filesystem writer
   config.py        # config loader (TOML + env vars)
   run.py           # orchestrator — shell → core → shell, no logic
   __main__.py      # CLI entrypoint
+scripts/
+  dump-intercept-stats.sh  # dumps iptables DNS_INTERCEPT counters before each run
 ```
 
 Follows **Functional Core / Imperative Shell** (Gary Bernhardt). Core never imports from shell. Shell may import types from core.
@@ -188,6 +191,35 @@ uv run pytest tests/ -q
 uv run mypy dns_briefing/
 uv run ruff check dns_briefing/ tests/
 ```
+
+## DNS enforcement (optional)
+
+If your router supports static routes, you can force devices that hardcode public DNS servers (Chromecasts, smart TVs) through AdGuard. The briefing will include a **DNS Enforcement** section reporting how many bypass attempts were intercepted.
+
+**How it works:** Add static `/32` routes on your router for common public DNS IPs (`8.8.8.8`, `1.1.1.1`, etc.) pointing to your mav IP. Then run `dns-intercept.sh` on the host — it sets up iptables DNAT rules that redirect port 53 traffic to AdGuard, and blackhole routes that drop non-DNS traffic to those IPs (preventing routing loops).
+
+**Setup:**
+1. Copy `scripts/dump-intercept-stats.sh` to your host
+2. The `systemd/dns-briefing.service` already includes an `ExecStartPre` line that runs it before each briefing
+3. Stats are written to `data/intercept_stats.json` and mounted into the container
+
+If the iptables chain doesn't exist (intercept not set up), the section is silently omitted.
+
+Optionally, drop a `fingerprint_snapshot.json` in the data directory before each run to get a **Device Profiles** section — OS fingerprints cross-referenced with per-client DNS behavior. The file format:
+
+```json
+{
+  "available": true,
+  "devices": [
+    {"ip": "192.168.1.10", "os": "Linux 3.x", "link_type": "Ethernet", "distance_hops": 1, "uptime_min": 1234, "http_os": ""}
+  ],
+  "recent_changes": [
+    {"ip": "192.168.1.10", "detected_at": "...", "previous_os": "Windows NT", "current_os": "Linux 3.x"}
+  ]
+}
+```
+
+Any tool that passively fingerprints your network (p0f, etc.) can generate this. If the file is absent or `available` is false, the section is silently omitted.
 
 ## Tuning the reports
 

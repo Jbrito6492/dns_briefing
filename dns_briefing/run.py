@@ -13,6 +13,8 @@ from dns_briefing.core.aggregator import build_evidence_packet
 from dns_briefing.core.prompt import build_prompt
 from dns_briefing.shell.adguard import AdGuardClient
 from dns_briefing.shell.bedrock import BedrockClient
+from dns_briefing.shell.fingerprint import read_fingerprint_snapshot
+from dns_briefing.shell.intercept import read_intercept_stats
 from dns_briefing.shell.state import StateDB
 from dns_briefing.shell.writer import ReportWriter
 
@@ -28,6 +30,11 @@ def run(config: Config, dry_run: bool = False) -> str:
     agh = AdGuardClient(config.adguard.base_url, config.adguard.username, config.adguard.password)
     entries = agh.fetch_window(hours=config.report.window_hours, now=now)
     logger.info("Fetched %d entries", len(entries))
+
+    # ── Shell: read intercept + fingerprint stats (optional) ─────────────
+    data_dir = config.state.db_path.rsplit("/", 1)[0]
+    intercept_stats = read_intercept_stats(data_dir)
+    fingerprint_snapshot = read_fingerprint_snapshot(data_dir)
 
     # ── Shell: read state, compute inputs for core ────────────────────────
     with StateDB(config.state.db_path) as state:
@@ -50,6 +57,8 @@ def run(config: Config, dry_run: bool = False) -> str:
         off_hours_start=config.report.off_hours_start,
         off_hours_end=config.report.off_hours_end,
         device_map=config.devices,
+        intercept_stats=intercept_stats,
+        fingerprint_snapshot=fingerprint_snapshot,
     )
 
     # ── Core: build prompt ────────────────────────────────────────────────

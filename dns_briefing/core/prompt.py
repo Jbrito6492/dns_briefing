@@ -69,6 +69,22 @@ Speculate on causes when there is a reasonable explanation.
 Anything else worth a human look. Blocked domain patterns, unexpected service calls, \
 timing correlations. Be opinionated. This is where you earn your keep.
 
+## Device Profiles
+Include this section ONLY if the evidence packet contains a "device_profiles" key. \
+Cross-reference fingerprinted OS against the device name from per_client data. \
+Call out: unknown IPs that now have an OS identity, fingerprint changes (may indicate \
+new device on a familiar IP, firmware update, or something worth investigating), \
+and any mismatch between expected device type and observed OS. \
+If all fingerprints match expectations and nothing changed, one sentence is enough. \
+Omit entirely if no device_profiles key.
+
+## DNS Enforcement
+Include this section ONLY if the evidence packet contains a "dns_enforcement" key. \
+Report how many queries were intercepted from devices attempting to bypass AdGuard \
+(hardcoded resolvers like 8.8.8.8 or 1.1.1.1). Name the likely offenders based on \
+per_client data — smart TVs and streaming devices are the usual suspects. \
+If zero interceptions, omit this section entirely.
+
 ## All Clear
 1–2 lines on what was normal and boring today. Give the owner permission to stop reading.
 

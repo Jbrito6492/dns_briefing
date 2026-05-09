@@ -7,6 +7,7 @@ Requires=docker.service
 Type=oneshot
 User=ubuntu
 EnvironmentFile=/home/ubuntu/.env.dns_briefing
+ExecStartPre=/bin/bash /home/ubuntu/dns_briefing/scripts/dump-intercept-stats.sh
 ExecStart=/usr/bin/docker run --rm \
   --name dns-briefing \
   --env-file /home/ubuntu/.env.dns_briefing \

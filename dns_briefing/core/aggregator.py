@@ -41,6 +41,8 @@ def build_evidence_packet(
     off_hours_start: str,
     off_hours_end: str,
     device_map: dict[str, str],
+    intercept_stats: dict[str, Any] | None = None,
+    fingerprint_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     tz = ZoneInfo(config_timezone)
 
@@ -202,7 +204,7 @@ def build_evidence_packet(
         """).fetchall()
     ]
 
-    return {
+    packet: dict[str, Any] = {
         "summary": summary,
         "top_domains": top_domains,
         "per_client": per_client,
@@ -211,3 +213,29 @@ def build_evidence_packet(
         "volume_anomalies": volume_anomalies,
         "blocked_domains": blocked_domains,
     }
+
+    if fingerprint_snapshot:
+        packet["device_profiles"] = {
+            "devices": fingerprint_snapshot.get("devices", []),
+            "recent_changes": fingerprint_snapshot.get("recent_changes", []),
+            "note": (
+                "OS fingerprints collected passively by p0f from TCP SYN packets. "
+                "No active scanning. 'distance_hops' is estimated hops from mav. "
+                "Changes indicate a device OS shift — may mean firmware update, IP reassignment, or anomaly."
+            ),
+        }
+
+    if intercept_stats:
+        packet["dns_enforcement"] = {
+            "intercepted_queries": intercept_stats.get("intercepted_queries", 0),
+            "intercepted_bytes": intercept_stats.get("intercepted_bytes", 0),
+            "udp_queries": intercept_stats.get("udp_queries", 0),
+            "tcp_queries": intercept_stats.get("tcp_queries", 0),
+            "note": (
+                "Queries intercepted from devices that bypassed DHCP DNS "
+                "and sent to hardcoded public resolvers (8.8.8.8, 1.1.1.1, etc). "
+                "These were silently redirected to AdGuard."
+            ),
+        }
+
+    return packet
