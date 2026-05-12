@@ -61,7 +61,7 @@ def packet(entries: list[QueryEntry]) -> dict:
 
     return build_evidence_packet(
         entries=entries,
-        known_domains=NEW_DOMAIN_SET,
+        unseen_domains=NEW_DOMAIN_SET,
         volume_baseline=BASELINE,
         today=Date(2026, 5, 8),
         config_timezone="America/Phoenix",

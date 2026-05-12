@@ -517,11 +517,12 @@ class ReportWriter:
 
     def write(self, report: str, report_date: date) -> None:
         self._write_local(report, report_date)
-        self._write_html(report, report_date)
+        html = self._render_html(report, report_date)
+        self._write_html(html, report_date)
         self._update_index()
         if not self._dry_run:
             self._write_s3(report, report_date)
-            self._write_s3_html(report, report_date)
+            self._write_s3_html(html, report_date)
 
     # ── Markdown (local) ─────────────────────────────────────────────────────
 
@@ -533,16 +534,18 @@ class ReportWriter:
 
     # ── HTML (local) ──────────────────────────────────────────────────────────
 
-    def _write_html(self, report: str, report_date: date) -> None:
+    def _render_html(self, report: str, report_date: date) -> str:
         content_html = _md.markdown(report, extensions=["extra", "nl2br"])
         date_display = report_date.strftime("%A, %B %-d, %Y")
         generated_at = datetime.now(tz=UTC).strftime("%H:%M")
-        html = _REPORT_TEMPLATE.format(
+        return _REPORT_TEMPLATE.format(
             date_display=date_display,
             network_name=self._network_name,
             generated_at=generated_at,
             content_html=content_html,
         )
+
+    def _write_html(self, html: str, report_date: date) -> None:
         dated_html = self._local_dir / f"{report_date.isoformat()}.html"
         dated_html.write_text(html, encoding="utf-8")
         self._symlink(self._local_dir / "latest.html", dated_html.name)
@@ -573,11 +576,8 @@ class ReportWriter:
             Bucket=self._s3_bucket, Key="latest.md", Body=body, ContentType="text/markdown"
         )
 
-    def _write_s3_html(self, report: str, report_date: date) -> None:
-        dated_html = self._local_dir / f"{report_date.isoformat()}.html"
-        if not dated_html.exists():
-            return
-        html_body = dated_html.read_bytes()
+    def _write_s3_html(self, html: str, report_date: date) -> None:
+        html_body = html.encode("utf-8")
         key = f"{report_date.year}/{report_date.month:02d}/{report_date.day:02d}.html"
         self._s3.put_object(
             Bucket=self._s3_bucket, Key=key, Body=html_body, ContentType="text/html"

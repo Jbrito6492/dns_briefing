@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 from dns_briefing.config import Config
 from dns_briefing.core.aggregator import build_evidence_packet
@@ -32,14 +33,14 @@ def run(config: Config, dry_run: bool = False) -> str:
     logger.info("Fetched %d entries", len(entries))
 
     # ── Shell: read intercept + fingerprint stats (optional) ─────────────
-    data_dir = config.state.db_path.rsplit("/", 1)[0]
+    data_dir = str(Path(config.state.db_path).parent)
     intercept_stats = read_intercept_stats(data_dir)
     fingerprint_snapshot = read_fingerprint_snapshot(data_dir)
 
     # ── Shell: read state, compute inputs for core ────────────────────────
     with StateDB(config.state.db_path) as state:
         all_domains = [e.domain for e in entries]
-        known_domains = set(
+        unseen_domains = set(
             state.update_known_domains(all_domains, today, config.state.known_domains_window_days)
         )
         volume_baseline = state.get_volume_baseline(config.state.volume_baseline_days, today)
@@ -50,7 +51,7 @@ def run(config: Config, dry_run: bool = False) -> str:
     logger.info("Building evidence packet...")
     packet = build_evidence_packet(
         entries=entries,
-        known_domains=known_domains,
+        unseen_domains=unseen_domains,
         volume_baseline=volume_baseline,
         today=today,
         config_timezone=config.report.timezone,
