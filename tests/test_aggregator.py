@@ -78,8 +78,8 @@ def test_top_domains_present(packet: dict) -> None:
 
 def test_off_hours_contains_sketchy_domain(packet: dict) -> None:
     off = packet["off_hours_activity"]
-    domains = [e["domain"] for e in off["entries"]]
-    assert "telemetry-sink.sketchy-analytics.io" in domains
+    all_domains = [d["domain"] for device in off["by_device"] for d in device["top_domains"]]
+    assert "telemetry-sink.sketchy-analytics.io" in all_domains
 
 
 def test_off_hours_window_metadata(packet: dict) -> None:
@@ -87,6 +87,30 @@ def test_off_hours_window_metadata(packet: dict) -> None:
     assert off["window_start"] == "01:00"
     assert off["window_end"] == "05:00"
     assert off["timezone"] == "America/Phoenix"
+
+
+def test_off_hours_by_device_structure(packet: dict) -> None:
+    off = packet["off_hours_activity"]
+    assert "by_device" in off
+    assert "entries" not in off
+    for device in off["by_device"]:
+        assert {"device", "client", "total", "top_domains"} <= device.keys()
+        for domain in device["top_domains"]:
+            assert {
+                "domain",
+                "count",
+                "blocked",
+                "first_seen_local",
+                "last_seen_local",
+            } <= domain.keys()
+
+
+def test_off_hours_time_format(packet: dict) -> None:
+    off = packet["off_hours_activity"]
+    for device in off["by_device"]:
+        for d in device["top_domains"]:
+            assert len(d["first_seen_local"]) == 5 and d["first_seen_local"][2] == ":"
+            assert len(d["last_seen_local"]) == 5 and d["last_seen_local"][2] == ":"
 
 
 def test_new_domains_detected(packet: dict) -> None:
