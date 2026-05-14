@@ -1,4 +1,3 @@
-# dns_briefing/bedrock.py
 from __future__ import annotations
 
 import json
@@ -21,33 +20,43 @@ class BedrockClient:
 
     @classmethod
     def from_config(cls, region: str, model_id: str) -> BedrockClient:
-        client = boto3.client("bedrock-runtime", region_name=region)
-        return cls(client, model_id)
+        return cls(boto3.client("bedrock-runtime", region_name=region), model_id)
 
     def generate_report(
         self,
         messages: list[dict[str, str]],
         system: str = SYSTEM_PROMPT,
     ) -> str:
-        body = json.dumps(
-            {
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": MAX_TOKENS,
-                "system": system,
-                "messages": messages,
-            }
-        )
-        response = self._client.invoke_model(
+        response = self._client.invoke_model_with_response_stream(
             modelId=self._model_id,
-            body=body,
+            body=json.dumps(
+                {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": MAX_TOKENS,
+                    "system": system,
+                    "messages": messages,
+                }
+            ),
             contentType="application/json",
             accept="application/json",
         )
-        result: dict[str, Any] = json.loads(response["body"].read())
-        stop_reason = result.get("stop_reason")
+        return self._collect_stream(response["body"])
+
+    def _collect_stream(self, stream: Any) -> str:
+        parts: list[str] = []
+        stop_reason: str | None = None
+
+        for event in stream:
+            chunk = json.loads(event["chunk"]["bytes"])
+            match chunk.get("type"):
+                case "content_block_delta":
+                    parts.append(chunk["delta"]["text"])
+                case "message_delta":
+                    stop_reason = chunk["delta"].get("stop_reason")
+
         if stop_reason == "max_tokens":
             raise RuntimeError(
                 f"Briefing truncated: model hit max_tokens={MAX_TOKENS}. "
                 "Increase MAX_TOKENS or split the prompt."
             )
-        return str(result["content"][0]["text"])
+        return "".join(parts)
