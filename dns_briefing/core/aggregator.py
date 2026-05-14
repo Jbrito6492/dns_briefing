@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Any, cast
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import duckdb
@@ -46,11 +46,6 @@ def _aggregate_off_hours(
 ) -> dict[str, Any]:
     tz = ZoneInfo(timezone)
 
-    total: int = con.execute(
-        "SELECT COUNT(*) FROM entries WHERE time >= ? AND time < ?",
-        [off_start, off_end],
-    ).fetchone()[0]  # type: ignore[index]
-
     rows = con.execute(
         """
         SELECT
@@ -68,8 +63,7 @@ def _aggregate_off_hours(
         [off_start, off_end],
     ).fetchall()
 
-    # Rows are globally sorted by count DESC. Iterating in order means
-    # the first domain seen for each client is their highest-count domain.
+    # Rows globally sorted by count DESC — first domain per client is their highest.
     by_client: dict[str, list[dict[str, Any]]] = {}
     client_totals: dict[str, int] = {}
 
@@ -98,11 +92,11 @@ def _aggregate_off_hours(
                 "device": device_map.get(client, client),
                 "client": client,
                 "total": client_total,
-                "top_domains": by_client.get(client, []),
+                "top_domains": by_client[client],
             }
             for client, client_total in client_totals.items()
         ],
-        key=lambda x: cast(int, x["total"]),
+        key=lambda x: x["total"],  # type: ignore[return-value, arg-type]
         reverse=True,
     )
 
@@ -110,7 +104,7 @@ def _aggregate_off_hours(
         "window_start": off_hours_start,
         "window_end": off_hours_end,
         "timezone": timezone,
-        "total_queries": total,
+        "total_queries": sum(client_totals.values()),
         "by_device": by_device,
     }
 
