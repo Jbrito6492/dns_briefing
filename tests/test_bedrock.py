@@ -4,6 +4,8 @@ import json
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
 from dns_briefing.core.prompt import build_prompt
 from dns_briefing.shell.bedrock import BedrockClient
 
@@ -35,22 +37,25 @@ def _sample_packet() -> dict[str, Any]:
             "window_end": "05:00",
             "timezone": "America/Phoenix",
             "total_queries": 32,
-            "entries": [
+            "by_device": [
                 {
-                    "time_local": "03:00",
                     "device": "Smart-TV",
-                    "domain": "telemetry-sink.sketchy-analytics.io",
-                    "reason": "NotFilteredNotFound",
-                    "blocked": False,
+                    "client": "192.168.1.10",
+                    "total": 32,
+                    "top_domains": [
+                        {
+                            "domain": "telemetry-sink.sketchy-analytics.io",
+                            "count": 32,
+                            "blocked": False,
+                            "first_seen_local": "03:00",
+                            "last_seen_local": "04:45",
+                        }
+                    ],
                 }
             ],
         },
         "new_domains": [
-            {
-                "domain": "app.new-saas-tool-never-seen.io",
-                "count": 1,
-                "first_client": "Laptop",
-            },
+            {"domain": "app.new-saas-tool-never-seen.io", "count": 1, "first_client": "Laptop"},
             {
                 "domain": "telemetry-sink.sketchy-analytics.io",
                 "count": 1,
@@ -78,6 +83,10 @@ def _sample_packet() -> dict[str, Any]:
     }
 
 
+def _make_stream(chunks: list[dict]) -> list[dict]:
+    return [{"chunk": {"bytes": json.dumps(c).encode()}} for c in chunks]
+
+
 def test_build_prompt_embeds_evidence() -> None:
     msgs = build_prompt(_sample_packet(), "2026-05-08", "America/Phoenix", "01:00", "05:00")
     combined = json.dumps(msgs)
@@ -94,15 +103,27 @@ def test_build_prompt_returns_message_list() -> None:
     assert msgs[0]["role"] == "user"
 
 
-def test_bedrock_client_invokes_model() -> None:
+def test_bedrock_client_streams_model() -> None:
     mock_boto = MagicMock()
-    mock_body = json.dumps(
-        {
-            "content": [{"type": "text", "text": "## TL;DR\n- Nothing bad"}],
-            "stop_reason": "end_turn",
-        }
-    ).encode()
-    mock_boto.invoke_model.return_value = {"body": MagicMock(read=lambda: mock_body)}
+    stream_events = _make_stream(
+        [
+            {"type": "message_start", "message": {}},
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "text", "text": ""},
+            },
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "## TL;DR\n- Nothing bad"},
+            },
+            {"type": "content_block_stop", "index": 0},
+            {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
+            {"type": "message_stop"},
+        ]
+    )
+    mock_boto.invoke_model_with_response_stream.return_value = {"body": stream_events}
 
     client = BedrockClient(mock_boto, "us.anthropic.claude-sonnet-4-6")
     result = client.generate_report(
@@ -111,6 +132,25 @@ def test_bedrock_client_invokes_model() -> None:
     )
 
     assert "TL;DR" in result
-    mock_boto.invoke_model.assert_called_once()
-    call_kwargs = mock_boto.invoke_model.call_args[1]
+    mock_boto.invoke_model_with_response_stream.assert_called_once()
+    call_kwargs = mock_boto.invoke_model_with_response_stream.call_args[1]
     assert call_kwargs["modelId"] == "us.anthropic.claude-sonnet-4-6"
+
+
+def test_bedrock_raises_on_max_tokens() -> None:
+    mock_boto = MagicMock()
+    stream_events = _make_stream(
+        [
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "truncated..."},
+            },
+            {"type": "message_delta", "delta": {"stop_reason": "max_tokens"}},
+        ]
+    )
+    mock_boto.invoke_model_with_response_stream.return_value = {"body": stream_events}
+
+    client = BedrockClient(mock_boto, "us.anthropic.claude-sonnet-4-6")
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        client.generate_report(messages=[{"role": "user", "content": "test"}])
