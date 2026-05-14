@@ -103,24 +103,16 @@ def test_build_prompt_returns_message_list() -> None:
     assert msgs[0]["role"] == "user"
 
 
-def test_bedrock_client_streams_model() -> None:
+def test_generate_report_returns_extracted_text() -> None:
     mock_boto = MagicMock()
     stream_events = _make_stream(
         [
-            {"type": "message_start", "message": {}},
-            {
-                "type": "content_block_start",
-                "index": 0,
-                "content_block": {"type": "text", "text": ""},
-            },
             {
                 "type": "content_block_delta",
                 "index": 0,
                 "delta": {"type": "text_delta", "text": "## TL;DR\n- Nothing bad"},
             },
-            {"type": "content_block_stop", "index": 0},
             {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
-            {"type": "message_stop"},
         ]
     )
     mock_boto.invoke_model_with_response_stream.return_value = {"body": stream_events}
@@ -131,10 +123,33 @@ def test_bedrock_client_streams_model() -> None:
         system="You are an analyst.",
     )
 
-    assert "TL;DR" in result
-    mock_boto.invoke_model_with_response_stream.assert_called_once()
-    call_kwargs = mock_boto.invoke_model_with_response_stream.call_args[1]
-    assert call_kwargs["modelId"] == "us.anthropic.claude-sonnet-4-6"
+    assert result == "## TL;DR\n- Nothing bad"
+
+
+def test_generate_report_assembles_multiple_chunks() -> None:
+    mock_boto = MagicMock()
+    stream_events = _make_stream(
+        [
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "Hello "},
+            },
+            {"type": "message_start", "message": {}},
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "world"},
+            },
+            {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
+        ]
+    )
+    mock_boto.invoke_model_with_response_stream.return_value = {"body": stream_events}
+
+    client = BedrockClient(mock_boto, "us.anthropic.claude-sonnet-4-6")
+    result = client.generate_report(messages=[{"role": "user", "content": "test"}])
+
+    assert result == "Hello world"
 
 
 def test_bedrock_raises_on_max_tokens() -> None:
