@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import duckdb
@@ -30,6 +30,89 @@ def _top_domains_for_client(con: duckdb.DuckDBPyConnection, client: str) -> list
             [client],
         ).fetchall()
     ]
+
+
+_OFF_HOURS_DOMAIN_LIMIT = 10
+
+
+def _aggregate_off_hours(
+    con: duckdb.DuckDBPyConnection,
+    off_start: datetime,
+    off_end: datetime,
+    off_hours_start: str,
+    off_hours_end: str,
+    timezone: str,
+    device_map: dict[str, str],
+) -> dict[str, Any]:
+    tz = ZoneInfo(timezone)
+
+    total: int = con.execute(
+        "SELECT COUNT(*) FROM entries WHERE time >= ? AND time < ?",
+        [off_start, off_end],
+    ).fetchone()[0]  # type: ignore[index]
+
+    rows = con.execute(
+        """
+        SELECT
+            client,
+            domain,
+            bool_or(blocked)  AS blocked,
+            COUNT(*)          AS count,
+            MIN(time)         AS first_seen,
+            MAX(time)         AS last_seen
+        FROM entries
+        WHERE time >= ? AND time < ?
+        GROUP BY client, domain
+        ORDER BY count DESC
+        """,
+        [off_start, off_end],
+    ).fetchall()
+
+    # Rows are globally sorted by count DESC. Iterating in order means
+    # the first domain seen for each client is their highest-count domain.
+    by_client: dict[str, list[dict[str, Any]]] = {}
+    client_totals: dict[str, int] = {}
+
+    for client, domain, blocked, count, first_seen, last_seen in rows:
+        client_totals[client] = client_totals.get(client, 0) + count
+        if client not in by_client:
+            by_client[client] = []
+        if len(by_client[client]) < _OFF_HOURS_DOMAIN_LIMIT:
+            by_client[client].append(
+                {
+                    "domain": domain,
+                    "count": count,
+                    "blocked": blocked,
+                    "first_seen_local": first_seen.replace(tzinfo=UTC)
+                    .astimezone(tz)
+                    .strftime("%H:%M"),
+                    "last_seen_local": last_seen.replace(tzinfo=UTC)
+                    .astimezone(tz)
+                    .strftime("%H:%M"),
+                }
+            )
+
+    by_device = sorted(
+        [
+            {
+                "device": device_map.get(client, client),
+                "client": client,
+                "total": client_total,
+                "top_domains": by_client.get(client, []),
+            }
+            for client, client_total in client_totals.items()
+        ],
+        key=lambda x: cast(int, x["total"]),
+        reverse=True,
+    )
+
+    return {
+        "window_start": off_hours_start,
+        "window_end": off_hours_end,
+        "timezone": timezone,
+        "total_queries": total,
+        "by_device": by_device,
+    }
 
 
 def build_evidence_packet(
@@ -121,31 +204,9 @@ def build_evidence_packet(
         off_start = _parse_hhmm(off_hours_start, tz, today).astimezone(UTC).replace(tzinfo=None)
         off_end = _parse_hhmm(off_hours_end, tz, today).astimezone(UTC).replace(tzinfo=None)
 
-        off_rows = con.execute(
-            """
-            SELECT time, client, domain, reason, blocked, block_rule
-            FROM entries WHERE time >= ? AND time < ?
-            ORDER BY time
-        """,
-            [off_start, off_end],
-        ).fetchall()
-
-        off_hours: dict[str, Any] = {
-            "window_start": off_hours_start,
-            "window_end": off_hours_end,
-            "timezone": config_timezone,
-            "total_queries": len(off_rows),
-            "entries": [
-                {
-                    "time_local": row[0].replace(tzinfo=UTC).astimezone(tz).strftime("%H:%M"),
-                    "device": device(row[1]),
-                    "domain": row[2],
-                    "reason": row[3],
-                    "blocked": row[4],
-                }
-                for row in off_rows
-            ],
-        }
+        off_hours = _aggregate_off_hours(
+            con, off_start, off_end, off_hours_start, off_hours_end, config_timezone, device_map
+        )
 
         # ── New domains ───────────────────────────────────────────────────────
         new_domains: list[dict[str, Any]] = []
