@@ -5,16 +5,18 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-User=ubuntu
-EnvironmentFile=/home/ubuntu/.env.dns_briefing
-ExecStartPre=/bin/bash /home/ubuntu/dns_briefing/scripts/dump-intercept-stats.sh
+# Replace YOUR_USER with the user that owns the dns-briefing files
+User=YOUR_USER
+# Replace /path/to with the directory containing your .env file, data/, reports/, etc.
+EnvironmentFile=/path/to/.env.dns_briefing
+ExecStartPre=/bin/bash /path/to/dns_briefing/scripts/dump-intercept-stats.sh
 ExecStart=/usr/bin/docker run --rm \
   --name dns-briefing \
-  --env-file /home/ubuntu/.env.dns_briefing \
+  --env-file /path/to/.env.dns_briefing \
   --network host \
-  -v /home/ubuntu/dns_briefing/data:/home/ubuntu/dns_briefing/data \
-  -v /home/ubuntu/dns_briefing/reports:/home/ubuntu/dns_briefing/reports \
-  -v /home/ubuntu/dns_briefing/config.local.toml:/app/config.local.toml:ro \
+  -v /path/to/dns_briefing/data:/app/data \
+  -v /path/to/dns_briefing/reports:/app/reports \
+  -v /path/to/dns_briefing/config.local.toml:/app/config.local.toml:ro \
   dns-briefing:latest
 StandardOutput=journal
 StandardError=journal

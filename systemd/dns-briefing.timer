@@ -2,7 +2,7 @@
 Description=DNS Briefing Daily Report Timer
 
 [Timer]
-# 15:00 UTC = 08:00 America/Phoenix (no DST)
+# Set to UTC time that matches your desired local run time
 OnCalendar=*-*-* 15:00:00 UTC
 Persistent=true
 

@@ -82,15 +82,15 @@ bedrock_model_id = "us.anthropic.claude-sonnet-4-6"
 s3_bucket = "your-bucket-name"
 
 [report]
-local_dir = "/path/to/reports"
+local_dir = "/app/reports"         # container-internal path — matches volume mount in systemd service
 off_hours_start = "01:00"
 off_hours_end = "05:00"
-timezone = "America/Phoenix"       # your local timezone
+timezone = "America/New_York"      # your local timezone
 network_name = "Home Network"
 window_hours = 24
 
 [state]
-db_path = "/path/to/data/state.db"
+db_path = "/app/data/state.db"     # container-internal path — matches volume mount in systemd service
 known_domains_window_days = 30
 volume_baseline_days = 14
 ```
@@ -136,19 +136,29 @@ docker run --rm \
 Serve the HTML reports via nginx. On your server:
 
 ```bash
-docker run -d \
-  --name dns-briefing-web \
-  --restart unless-stopped \
-  -p 8765:80 \
-  -v /path/to/reports:/usr/share/nginx/html:ro \
-  nginx:alpine
+sudo apt install nginx
+
+# Edit nginx/dns-briefing.conf — set root to your host reports directory (matches volume mount host path)
+# Then copy:
+sudo cp nginx/dns-briefing.conf /etc/nginx/sites-available/dns-briefing
+sudo ln -s /etc/nginx/sites-available/dns-briefing /etc/nginx/sites-enabled/dns-briefing
+
+# Remove the default site if present (occupies port 80, won't conflict, but keep things clean)
+sudo rm -f /etc/nginx/sites-enabled/default
+
+sudo nginx -t
+sudo systemctl enable --now nginx
 ```
 
 Then browse to `http://your-host:8765`. Each daily run regenerates `index.html`, `latest.html`, and a dated `YYYY-MM-DD.html`.
 
 If you use Tailscale, this is accessible from any device on your tailnet with no port forwarding.
 
+nginx is managed by systemd and starts automatically on boot — no Docker restart-policy fragility.
+
 ### 6. systemd timer (runs daily at 08:00 local time)
+
+Edit `systemd/dns-briefing.service` before copying — replace `YOUR_USER` and all `/path/to/` placeholders with your actual username and directory. Edit `systemd/dns-briefing.timer` to set your desired UTC run time.
 
 Copy the unit files from `systemd/` to `/etc/systemd/system/`, then:
 
