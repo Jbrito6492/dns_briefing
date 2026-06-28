@@ -8,9 +8,9 @@ import boto3
 import markdown as _md
 
 # ── HTML template ──────────────────────────────────────────────────────────────
-# Design: dark intelligence-briefing aesthetic.
-# Cormorant Garamond (authoritative serif) + Crimson Pro (body) + Fira Mono (data).
-# Electric lime (#a3e635) accent on deep navy. Grain texture overlay.
+# Design: terminal aesthetic — monospace throughout, phosphor-tinted palette.
+# JetBrains Mono + Fira Mono (fallback). Electric lime (#a3e635) on near-black.
+# CRT scanline overlay. Blinking cursor in header prompt. 1080px wide column.
 _REPORT_TEMPLATE = """\
 <!DOCTYPE html>
 <html lang="en">
@@ -20,56 +20,57 @@ _REPORT_TEMPLATE = """\
 <title>DNS Briefing — {date_display}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,400&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {{
-  --bg:           #06070d;
-  --surface:      #0a0c15;
-  --surface-2:    #0e1020;
-  --border:       #181e30;
-  --border-hi:    #252d45;
-  --text:         #aab4c8;
-  --text-bright:  #d4dcea;
-  --text-muted:   #3e4a62;
+  --bg:           #080808;
+  --surface:      #0e0e0e;
+  --surface-2:    #141414;
+  --border:       #1c1c1c;
+  --border-hi:    #2a2a2a;
+  --text:         #b4c4b0;
+  --text-bright:  #e2f0de;
+  --text-muted:   #3a4a36;
   --accent:       #a3e635;
-  --accent-dim:   rgba(163,230,53,.1);
-  --accent-bd:    rgba(163,230,53,.25);
+  --accent-dim:   rgba(163,230,53,.07);
+  --accent-bd:    rgba(163,230,53,.2);
   --red:          #f87171;
-  --red-dim:      rgba(248,113,113,.08);
-  --cyan:         #67e8f9;
-  --amber:        #fcd34d;
-  --ff-display:   'Cormorant Garamond', Georgia, serif;
-  --ff-body:      'Crimson Pro', Georgia, serif;
-  --ff-mono:      'Fira Mono', 'Courier New', monospace;
+  --red-dim:      rgba(248,113,113,.07);
+  --cyan:         #5eead4;
+  --amber:        #f59e0b;
+  --ff-mono:      'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
 }}
 
 *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
-html {{ font-size: 18px; scroll-behavior: smooth; }}
+html {{ font-size: 16px; scroll-behavior: smooth; }}
 
 body {{
   background: var(--bg);
   color: var(--text);
-  font-family: var(--ff-body);
+  font-family: var(--ff-mono);
   font-weight: 300;
-  line-height: 1.78;
+  line-height: 1.75;
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
 }}
 
-/* Prevent any element from blowing out the layout */
 main, header, footer, article {{ max-width: 100%; overflow-x: hidden; }}
 
-/* Grain overlay */
-body::after {{
+/* CRT scanlines */
+body::before {{
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+  background: repeating-linear-gradient(
+    transparent 0px,
+    transparent 2px,
+    rgba(0,0,0,.06) 2px,
+    rgba(0,0,0,.06) 3px
+  );
   pointer-events: none;
-  z-index: 1000;
-  opacity: .6;
+  z-index: 900;
 }}
 
 /* Top accent line */
@@ -77,101 +78,156 @@ body::after {{
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent) 0%, rgba(163,230,53,.35) 55%, transparent 100%);
+  background: var(--accent);
+  opacity: .7;
   z-index: 999;
 }}
 
 /* ── Header ── */
 header {{
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 52px 32px 36px;
+  padding: 40px 40px 28px;
   border-bottom: 1px solid var(--border);
 }}
+
+/* ── Status bar ── */
+.status-bar {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  margin-bottom: 22px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--border-hi);
+}}
+
+.stat-key {{
+  color: var(--text-muted);
+  letter-spacing: .12em;
+  font-size: .62rem;
+  text-transform: uppercase;
+  margin-right: 5px;
+}}
+
+.stat-val {{
+  color: var(--text-bright);
+  font-weight: 500;
+}}
+
+.stat-sep {{ color: var(--border-hi); }}
+
+.stat-domain {{ color: var(--accent); }}
+
+.stat-count {{
+  color: var(--text-muted);
+  font-size: .88em;
+}}
+
+.term-prompt {{
+  font-size: .8rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  letter-spacing: .01em;
+}}
+
+.prompt-user   {{ color: var(--accent); font-weight: 500; }}
+.prompt-at     {{ color: var(--text-muted); }}
+.prompt-host   {{ color: var(--cyan); font-weight: 500; }}
+.prompt-sep    {{ color: var(--text-muted); }}
+.prompt-dir    {{ color: var(--accent); opacity: .6; }}
+.prompt-dollar {{ color: var(--text-muted); margin: 0 .4em; }}
+
+.cursor {{
+  display: inline-block;
+  width: .5em;
+  height: .9em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink 1.1s step-end infinite;
+}}
+@keyframes blink {{ 50% {{ opacity: 0; }} }}
 
 .header-row {{
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 28px;
+  align-items: flex-start;
+  gap: 16px;
 }}
 
-.classification {{
-  font-family: var(--ff-mono);
-  font-size: .6rem;
-  letter-spacing: .24em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}}
-
-.nav-link {{
-  font-family: var(--ff-mono);
-  font-size: .6rem;
-  letter-spacing: .12em;
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color .2s;
-}}
-.nav-link:hover {{ color: var(--accent); }}
+.header-left {{ flex: 1; }}
 
 .network-tag {{
-  display: inline-block;
-  font-family: var(--ff-mono);
-  font-size: .58rem;
-  letter-spacing: .2em;
+  font-size: .65rem;
+  letter-spacing: .18em;
   text-transform: uppercase;
-  color: var(--accent);
-  border: 1px solid var(--accent-bd);
-  background: var(--accent-dim);
-  padding: 3px 10px;
-  margin-bottom: 14px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: block;
 }}
 
 h1 {{
-  font-family: var(--ff-display);
-  font-size: clamp(3rem, 7vw, 5rem);
-  font-weight: 600;
+  font-family: var(--ff-mono);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 500;
   color: var(--text-bright);
-  letter-spacing: -.015em;
-  line-height: 1;
-  margin-bottom: 10px;
+  letter-spacing: -.02em;
+  line-height: 1.05;
+  margin-bottom: 6px;
 }}
 
+h1 .bracket {{ color: var(--accent); font-weight: 300; }}
+
 header time {{
-  font-family: var(--ff-display);
-  font-style: italic;
-  font-size: 1.05rem;
+  font-size: .75rem;
   color: var(--text-muted);
+  letter-spacing: .06em;
 }}
+
+.nav-link {{
+  font-size: .65rem;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color .15s;
+  white-space: nowrap;
+  margin-top: 4px;
+  display: inline-block;
+}}
+.nav-link:hover {{ color: var(--accent); }}
 
 /* ── Main content ── */
 main {{
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 44px 32px 72px;
+  padding: 36px 40px 72px;
 }}
 
 /* ── TL;DR card ── */
 .tldr-card {{
   background: var(--surface);
   border: 1px solid var(--border-hi);
-  border-left: 3px solid var(--accent);
-  padding: 24px 28px;
-  margin-bottom: 48px;
-  position: relative;
+  border-left: 2px solid var(--accent);
+  padding: 20px 24px;
+  margin-bottom: 44px;
 }}
 
 .tldr-card h2 {{
-  font-family: var(--ff-mono);
-  font-size: .6rem;
-  letter-spacing: .22em;
+  font-size: .65rem;
+  letter-spacing: .2em;
   text-transform: uppercase;
   color: var(--accent);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   margin-top: 0;
   border: none;
 }}
 
+.tldr-card h2::before,
 .tldr-card h2::after {{ display: none; }}
 
 .tldr-card ul {{
@@ -181,11 +237,10 @@ main {{
 }}
 
 .tldr-card li {{
-  font-family: var(--ff-body);
-  font-size: 1.05rem;
+  font-size: .9rem;
   color: var(--text-bright);
   line-height: 1.65;
-  padding: 6px 0 6px 22px;
+  padding: 8px 0 8px 24px;
   border-bottom: 1px solid var(--border);
   position: relative;
 }}
@@ -193,37 +248,37 @@ main {{
 .tldr-card li:last-child {{ border-bottom: none; }}
 
 .tldr-card li::before {{
-  content: '·';
+  content: '>';
   color: var(--accent);
-  font-size: 1.4rem;
-  line-height: 1.4;
+  font-weight: 500;
+  font-size: .85rem;
+  line-height: 1;
   position: absolute;
   left: 0;
-  top: 5px;
+  top: 10px;
 }}
 
 /* ── Section headers (h2) ── */
 .report h2 {{
   font-family: var(--ff-mono);
-  font-size: .62rem;
-  font-weight: 500;
-  letter-spacing: .2em;
+  font-size: .7rem;
+  font-weight: 400;
+  letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-top: 52px;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-top: 48px;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
-  position: relative;
 }}
 
-.report h2::after {{
-  content: '';
-  position: absolute;
-  bottom: -1px; left: 0;
-  width: 28px; height: 1px;
-  background: var(--accent);
+.report h2::before {{
+  content: '── ';
+  color: var(--accent);
+  letter-spacing: 0;
 }}
+
+.report h2::after {{ display: none; }}
 
 /* ── Body text ── */
 .report {{
@@ -232,20 +287,21 @@ main {{
 }}
 
 .report p {{
-  font-size: 1rem;
-  line-height: 1.82;
-  margin-bottom: 1.1em;
+  font-size: .9rem;
+  line-height: 1.8;
+  margin-bottom: 1em;
   color: var(--text);
 }}
 
 .report ul, .report ol {{
-  padding-left: 1.4em;
-  margin-bottom: 1.1em;
+  padding-left: 1.6em;
+  margin-bottom: 1em;
 }}
 
 .report li {{
-  margin-bottom: .35em;
-  line-height: 1.72;
+  margin-bottom: .3em;
+  line-height: 1.7;
+  font-size: .9rem;
 }}
 
 .report strong {{
@@ -261,21 +317,21 @@ main {{
 /* ── Inline code (domain names, IPs) ── */
 .report code {{
   font-family: var(--ff-mono);
-  font-size: .78em;
+  font-size: .85em;
   color: var(--accent);
   background: var(--accent-dim);
   border: 1px solid var(--accent-bd);
-  padding: .1em .32em;
-  border-radius: 2px;
+  padding: .05em .28em;
   overflow-wrap: anywhere;
 }}
 
 .report pre {{
   background: var(--surface-2);
   border: 1px solid var(--border);
-  padding: 1.25em 1.5em;
+  border-left: 2px solid var(--border-hi);
+  padding: 1em 1.25em;
   overflow-x: auto;
-  margin: 1.4em 0;
+  margin: 1.2em 0;
   white-space: pre-wrap;
   word-break: break-word;
 }}
@@ -284,70 +340,72 @@ main {{
   background: none;
   border: none;
   padding: 0;
-  font-size: .82em;
+  font-size: .85em;
   color: var(--cyan);
 }}
 
 .report a {{
   color: var(--cyan);
   text-decoration: none;
-  border-bottom: 1px solid rgba(103,232,249,.25);
-  transition: border-color .2s;
+  border-bottom: 1px solid rgba(94,234,212,.2);
+  transition: border-color .15s;
 }}
 .report a:hover {{ border-color: var(--cyan); }}
 
 /* ── Footer ── */
 footer {{
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 20px 32px 48px;
+  padding: 16px 40px 40px;
   border-top: 1px solid var(--border);
   display: flex;
-  gap: 10px;
-  font-family: var(--ff-mono);
-  font-size: .6rem;
-  letter-spacing: .1em;
+  gap: 12px;
+  font-size: .65rem;
+  letter-spacing: .08em;
   color: var(--text-muted);
 }}
 
 footer .sep {{ color: var(--border-hi); }}
 
-@media (max-width: 640px) {{
-  html {{ font-size: 16px; }}
-  header, main, footer {{ padding-left: 18px; padding-right: 18px; }}
-  header {{ padding-top: 36px; padding-bottom: 24px; }}
+@media (max-width: 768px) {{
+  html {{ font-size: 15px; }}
+  header, main, footer {{ padding-left: 20px; padding-right: 20px; }}
+  header {{ padding-top: 32px; padding-bottom: 20px; }}
   main {{ padding-top: 24px; padding-bottom: 48px; }}
-  footer {{ padding-top: 16px; padding-bottom: 32px; flex-wrap: wrap; gap: 6px; }}
-  h1 {{ font-size: 2.5rem; }}
-  .header-row {{ flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 18px; }}
-  .classification {{ white-space: normal; word-break: break-word; }}
-  .tldr-card {{ padding: 16px 14px; }}
-  .tldr-card li {{ font-size: .95rem; }}
-  .report h2 {{ margin-top: 32px; }}
-  .network-tag {{ font-size: .52rem; }}
+  footer {{ padding-top: 14px; padding-bottom: 32px; flex-wrap: wrap; gap: 6px; }}
+  h1 {{ font-size: 1.75rem; }}
+  .header-row {{ flex-direction: column; }}
+  .tldr-card {{ padding: 14px 16px; }}
+  .tldr-card li {{ font-size: .85rem; }}
+  .report h2 {{ margin-top: 36px; }}
+  .cursor {{ display: none; }}
+  .status-bar {{ display: none; }}
 }}
 </style>
 </head>
 <body>
 <div class="top-bar"></div>
 <header>
-  <div class="header-row">
-    <span class="classification">Internal &middot; Network Intelligence</span>
-    <a href="index.html" class="nav-link">Archive &rarr;</a>
+  <div class="term-prompt">
+    <span class="prompt-user">ubuntu</span><span class="prompt-at">@</span><span class="prompt-host">mav</span><span class="prompt-sep">:</span><span class="prompt-dir">~/dns-briefing</span><span class="prompt-dollar">$</span><span> cat latest.log</span><span class="cursor"></span>
   </div>
-  <div>
-    <span class="network-tag">{network_name}</span>
-    <h1>DNS Briefing</h1>
-    <time>{date_display}</time>
+  {stat_bar}
+  <div class="header-row">
+    <div class="header-left">
+      <span class="network-tag">{network_name}</span>
+      <h1><span class="bracket">[</span>dns-briefing<span class="bracket">]</span></h1>
+      <time>{date_display}</time>
+    </div>
+    <a href="index.html" class="nav-link">archive &rarr;</a>
   </div>
 </header>
 <main>
   <article class="report">{content_html}</article>
 </main>
 <footer>
-  <span>Generated {generated_at} UTC</span>
+  <span>generated {generated_at} utc</span>
   <span class="sep">&middot;</span>
-  <span>Next: 08:00 MST</span>
+  <span>next: 08:00 mst</span>
 </footer>
 <script>
 // Promote TL;DR into a card component
@@ -379,108 +437,149 @@ _INDEX_TEMPLATE = """\
 <title>DNS Briefing — {network_name}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Crimson+Pro:wght@300;400&family=Fira+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Fira+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
 :root {{
-  --bg: #06070d; --surface: #0a0c15; --border: #181e30; --border-hi: #252d45;
-  --text: #aab4c8; --text-bright: #d4dcea; --text-muted: #3e4a62;
-  --accent: #a3e635; --accent-dim: rgba(163,230,53,.1); --accent-bd: rgba(163,230,53,.25);
-  --ff-display: 'Cormorant Garamond', Georgia, serif;
-  --ff-body: 'Crimson Pro', Georgia, serif;
-  --ff-mono: 'Fira Mono', 'Courier New', monospace;
+  --bg: #080808; --surface: #0e0e0e; --border: #1c1c1c; --border-hi: #2a2a2a;
+  --text: #b4c4b0; --text-bright: #e2f0de; --text-muted: #3a4a36;
+  --accent: #a3e635; --accent-dim: rgba(163,230,53,.07); --accent-bd: rgba(163,230,53,.2);
+  --cyan: #5eead4;
+  --ff-mono: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
 }}
 *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-html {{ font-size: 18px; }}
+html {{ font-size: 16px; }}
 body {{
   background: var(--bg); color: var(--text);
-  font-family: var(--ff-body); font-weight: 300;
+  font-family: var(--ff-mono); font-weight: 300;
   min-height: 100vh; overflow-x: hidden;
 }}
-body::after {{
+body::before {{
   content: '';
   position: fixed; inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
-  pointer-events: none; z-index: 1000; opacity: .6;
+  background: repeating-linear-gradient(
+    transparent 0px, transparent 2px,
+    rgba(0,0,0,.06) 2px, rgba(0,0,0,.06) 3px
+  );
+  pointer-events: none; z-index: 900;
 }}
 .top-bar {{
   position: fixed; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--accent) 0%, rgba(163,230,53,.35) 55%, transparent 100%);
-  z-index: 999;
+  background: var(--accent); opacity: .7; z-index: 999;
 }}
-.wrap {{ max-width: 720px; margin: 0 auto; padding: 0 32px; }}
-header {{ padding: 52px 0 36px; border-bottom: 1px solid var(--border); }}
-.classification {{
-  font-family: var(--ff-mono); font-size: .6rem; letter-spacing: .24em;
-  text-transform: uppercase; color: var(--text-muted); margin-bottom: 28px; display: block;
+.wrap {{ max-width: 1080px; margin: 0 auto; padding: 0 40px; }}
+header {{ padding: 40px 0 28px; border-bottom: 1px solid var(--border); }}
+.term-prompt {{
+  font-size: .8rem; color: var(--text-muted); margin-bottom: 20px; letter-spacing: .01em;
+}}
+.prompt-user {{ color: var(--accent); font-weight: 500; }}
+.prompt-at, .prompt-sep {{ color: var(--text-muted); }}
+.prompt-host {{ color: var(--cyan); font-weight: 500; }}
+.prompt-dir {{ color: var(--accent); opacity: .6; }}
+.prompt-dollar {{ color: var(--text-muted); margin: 0 .4em; }}
+.cursor {{
+  display: inline-block; width: .5em; height: .9em;
+  background: var(--accent); vertical-align: text-bottom; margin-left: 2px;
+  animation: blink 1.1s step-end infinite;
+}}
+@keyframes blink {{ 50% {{ opacity: 0; }} }}
+.network-tag {{
+  font-size: .65rem; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 8px; display: block;
 }}
 h1 {{
-  font-family: var(--ff-display); font-size: clamp(2.8rem, 6vw, 4.5rem);
-  font-weight: 600; color: var(--text-bright); letter-spacing: -.015em; line-height: 1;
-  margin-bottom: 10px;
+  font-family: var(--ff-mono); font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 500; color: var(--text-bright); letter-spacing: -.02em; line-height: 1.05;
+  margin-bottom: 20px;
 }}
-.subtitle {{
-  font-family: var(--ff-display); font-style: italic; font-size: 1.05rem; color: var(--text-muted);
-}}
+h1 .bracket {{ color: var(--accent); font-weight: 300; }}
 .latest-btn {{
-  display: inline-block; margin-top: 28px;
-  font-family: var(--ff-mono); font-size: .65rem; letter-spacing: .15em;
-  text-transform: uppercase; color: var(--bg); background: var(--accent);
-  padding: 10px 20px; text-decoration: none; transition: opacity .2s;
+  display: inline-block;
+  font-size: .7rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--bg); background: var(--accent);
+  padding: 8px 18px; text-decoration: none; transition: opacity .15s; font-weight: 500;
 }}
 .latest-btn:hover {{ opacity: .85; }}
-main {{ padding: 44px 0 72px; }}
+main {{ padding: 36px 0 72px; }}
 .section-label {{
-  font-family: var(--ff-mono); font-size: .6rem; letter-spacing: .2em;
-  text-transform: uppercase; color: var(--text-muted); margin-bottom: 20px;
-  padding-bottom: 12px; border-bottom: 1px solid var(--border); position: relative;
-}}
-.section-label::after {{
-  content: ''; position: absolute; bottom: -1px; left: 0;
-  width: 28px; height: 1px; background: var(--accent);
-}}
-.report-list {{ list-style: none; }}
-.report-list li {{
+  font-size: .7rem; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 18px; padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }}
+.section-label::before {{ content: '── '; color: var(--accent); letter-spacing: 0; }}
+.report-list {{ list-style: none; }}
+.report-list li {{ border-bottom: 1px solid var(--border); }}
 .report-list a {{
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 0; color: var(--text); text-decoration: none;
-  font-family: var(--ff-mono); font-size: .72rem; letter-spacing: .06em;
-  transition: color .15s;
+  padding: 12px 0; color: var(--text); text-decoration: none;
+  font-size: .8rem; letter-spacing: .04em; transition: color .12s;
 }}
-.report-list a:hover {{ color: var(--accent); }}
-.report-list .arrow {{ color: var(--text-muted); font-size: .65rem; }}
+.report-list a::before {{ content: '>  '; color: var(--text-muted); transition: color .12s; }}
+.report-list a:hover, .report-list a:hover::before {{ color: var(--accent); }}
+.report-list .arrow {{ color: var(--text-muted); font-size: .7rem; }}
 footer {{
-  padding: 20px 0 48px; border-top: 1px solid var(--border);
-  font-family: var(--ff-mono); font-size: .6rem; letter-spacing: .1em; color: var(--text-muted);
+  padding: 16px 0 40px; border-top: 1px solid var(--border);
+  font-size: .65rem; letter-spacing: .08em; color: var(--text-muted);
 }}
-@media (max-width: 600px) {{
-  html {{ font-size: 16px; }}
+@media (max-width: 640px) {{
+  html {{ font-size: 15px; }}
   .wrap {{ padding: 0 20px; }}
-  header {{ padding: 36px 0 24px; }}
-  h1 {{ font-size: 2.6rem; }}
-  .latest-btn {{ display: block; text-align: center; margin-top: 20px; }}
-  .report-list a {{ font-size: .68rem; }}
+  header {{ padding: 32px 0 20px; }}
+  h1 {{ font-size: 1.75rem; }}
+  .latest-btn {{ display: block; text-align: center; }}
+  .cursor {{ display: none; }}
+  .report-list a {{ font-size: .75rem; }}
 }}
 </style>
 </head>
 <body>
 <div class="top-bar"></div>
 <header class="wrap">
-  <span class="classification">Internal &middot; Network Intelligence</span>
-  <h1>DNS Briefing</h1>
-  <p class="subtitle">{network_name}</p>
-  <a href="latest.html" class="latest-btn">Latest Report &rarr;</a>
+  <div class="term-prompt">
+    <span class="prompt-user">ubuntu</span><span class="prompt-at">@</span><span class="prompt-host">mav</span><span class="prompt-sep">:</span><span class="prompt-dir">~/dns-briefing</span><span class="prompt-dollar">$</span><span> ls -lt reports/</span><span class="cursor"></span>
+  </div>
+  <span class="network-tag">{network_name}</span>
+  <h1><span class="bracket">[</span>dns-briefing<span class="bracket">]</span></h1>
+  <a href="latest.html" class="latest-btn">latest report &rarr;</a>
 </header>
 <main class="wrap">
-  <p class="section-label" style="margin-top:0">Archive</p>
+  <p class="section-label" style="margin-top:0">archive</p>
   <ul class="report-list">
 {report_items}
   </ul>
 </main>
-<footer class="wrap">Daily briefings &middot; Runs 08:00 MST</footer>
+<footer class="wrap">daily briefings &middot; runs 08:00 mst</footer>
 </body>
 </html>"""
+
+
+def _render_stat_bar(stats: dict[str, Any] | None) -> str:
+    if not stats:
+        return ""
+    total = stats.get("total_queries") or 0
+    blocked = stats.get("total_blocked") or 0
+    clients = stats.get("unique_clients") or 0
+    top_domain = stats.get("top_blocked_domain") or ""
+    top_count = stats.get("top_blocked_count") or 0
+    pct = f"{blocked / total * 100:.1f}%" if total else "0.0%"
+
+    parts = [
+        f'<span class="stat"><span class="stat-key">QUERIES</span>'
+        f' <span class="stat-val">{total:,}</span></span>',
+        '<span class="stat-sep">&middot;</span>',
+        f'<span class="stat"><span class="stat-key">BLOCKED</span>'
+        f' <span class="stat-val">{pct}</span></span>',
+        '<span class="stat-sep">&middot;</span>',
+        f'<span class="stat"><span class="stat-key">CLIENTS</span>'
+        f' <span class="stat-val">{clients}</span></span>',
+    ]
+    if top_domain:
+        parts += [
+            '<span class="stat-sep">&middot;</span>',
+            f'<span class="stat"><span class="stat-key">TOP BLOCKED</span>'
+            f' <span class="stat-val stat-domain">{top_domain}</span>'
+            f' <span class="stat-count">({top_count:,})</span></span>',
+        ]
+    return f'<div class="status-bar">{"".join(parts)}</div>'
 
 
 class ReportWriter:
@@ -515,9 +614,9 @@ class ReportWriter:
             dry_run=dry_run,
         )
 
-    def write(self, report: str, report_date: date) -> None:
+    def write(self, report: str, report_date: date, stats: dict[str, Any] | None = None) -> None:
         self._write_local(report, report_date)
-        html = self._render_html(report, report_date)
+        html = self._render_html(report, report_date, stats=stats)
         self._write_html(html, report_date)
         self._update_index()
         if not self._dry_run:
@@ -534,7 +633,9 @@ class ReportWriter:
 
     # ── HTML (local) ──────────────────────────────────────────────────────────
 
-    def _render_html(self, report: str, report_date: date) -> str:
+    def _render_html(
+        self, report: str, report_date: date, stats: dict[str, Any] | None = None
+    ) -> str:
         content_html = _md.markdown(report, extensions=["extra", "nl2br"])
         date_display = report_date.strftime("%A, %B %-d, %Y")
         generated_at = datetime.now(tz=UTC).strftime("%H:%M")
@@ -543,6 +644,7 @@ class ReportWriter:
             network_name=self._network_name,
             generated_at=generated_at,
             content_html=content_html,
+            stat_bar=_render_stat_bar(stats),
         )
 
     def _write_html(self, html: str, report_date: date) -> None:
@@ -557,7 +659,7 @@ class ReportWriter:
         )
         items = "\n".join(
             f'    <li><a href="{p.name}"><span>{p.stem}</span>'
-            f'<span class="arrow">&#8599;</span></a></li>'
+            f'<span class="arrow">&rarr;</span></a></li>'
             for p in html_files
         )
         index_html = _INDEX_TEMPLATE.format(

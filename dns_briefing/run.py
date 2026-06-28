@@ -77,6 +77,16 @@ def run(config: Config, dry_run: bool = False) -> str:
     report = bedrock.generate_report(messages)
 
     # ── Shell: write output ───────────────────────────────────────────────
+    summary = packet["summary"]
+    blocked_domains = packet.get("blocked_domains", [])
+    stats = {
+        "total_queries": summary["total_queries"],
+        "total_blocked": summary["total_blocked"],
+        "unique_clients": summary["unique_clients"],
+        "top_blocked_domain": blocked_domains[0]["domain"] if blocked_domains else None,
+        "top_blocked_count": blocked_domains[0]["count"] if blocked_domains else None,
+    }
+
     writer = ReportWriter.from_config(
         local_dir=config.report.local_dir,
         s3_bucket=config.aws.s3_bucket,
@@ -84,7 +94,7 @@ def run(config: Config, dry_run: bool = False) -> str:
         network_name=config.report.network_name,
         dry_run=dry_run,
     )
-    writer.write(report, today)
+    writer.write(report, today, stats=stats)
     logger.info("Report written (dry_run=%s)", dry_run)
 
     return report
