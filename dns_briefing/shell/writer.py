@@ -185,10 +185,9 @@ main {{
   font-size: 1.05rem;
   color: var(--text-bright);
   line-height: 1.65;
-  padding: 6px 0;
+  padding: 6px 0 6px 22px;
   border-bottom: 1px solid var(--border);
-  display: flex;
-  gap: 12px;
+  position: relative;
 }}
 
 .tldr-card li:last-child {{ border-bottom: none; }}
@@ -197,8 +196,10 @@ main {{
   content: '·';
   color: var(--accent);
   font-size: 1.4rem;
-  line-height: 1.2;
-  flex-shrink: 0;
+  line-height: 1.4;
+  position: absolute;
+  left: 0;
+  top: 5px;
 }}
 
 /* ── Section headers (h2) ── */
@@ -266,7 +267,6 @@ main {{
   border: 1px solid var(--accent-bd);
   padding: .1em .32em;
   border-radius: 2px;
-  word-break: break-all;       /* long domains wrap instead of overflow */
   overflow-wrap: anywhere;
 }}
 

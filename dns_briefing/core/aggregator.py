@@ -271,13 +271,23 @@ def build_evidence_packet(
         }
 
         if fingerprint_snapshot:
+            enriched_devices = [
+                {**d, "device": device_map.get(d["ip"], d["ip"])}
+                for d in fingerprint_snapshot.get("devices", [])
+            ]
+            enriched_changes = [
+                {**c, "device": device_map.get(c["ip"], c["ip"])}
+                for c in fingerprint_snapshot.get("recent_changes", [])
+            ]
             packet["device_profiles"] = {
-                "devices": fingerprint_snapshot.get("devices", []),
-                "recent_changes": fingerprint_snapshot.get("recent_changes", []),
+                "devices": enriched_devices,
+                "recent_changes": enriched_changes,
                 "note": (
                     "OS fingerprints collected passively by p0f from TCP SYN packets. "
                     "No active scanning. 'distance_hops' is estimated hops from mav. "
-                    "Changes indicate a device OS shift — may mean firmware update, IP reassignment, or anomaly."
+                    "Changes indicate a device OS shift — may mean firmware update, IP reassignment, or anomaly. "
+                    "Devices labeled 'mav (local)' or 'mav (Orange Pi)' are the p0f sensor itself — "
+                    "fingerprint oscillation on those IPs is sensor self-traffic, not an anomaly."
                 ),
             }
 
